@@ -6,7 +6,7 @@ Please kindly note that this work is inspired by the great work [GAuG](https://a
 
 - Python >=3.8.5
 - Pytorch == 1.8.1
-- DGL == 0.6.2
+- DGL == 0.6.2      <!-- I can't find a version of 0.6.2, so I use 0.6.1 instead... -->
 - SciPy == 1.6.2
 - NetworkX==2.5.1
 
