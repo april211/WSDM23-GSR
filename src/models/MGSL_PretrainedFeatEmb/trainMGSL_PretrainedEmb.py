@@ -6,7 +6,7 @@ sys.path.append((osp.abspath(osp.dirname(__file__)).split('src')[0] + 'src'))
 from utils.early_stopper import EarlyStopping
 from utils.evaluation import eval_logits, eval_and_save
 
-from models.MGSL_PretrainedFeatEmb.MGSL import MGSL_PretrainedFeatEmb, NP_Encoder
+from models.MGSL_PretrainedFeatEmb.MGSL_PretrainedEmb import MGSL_PretrainedFeatEmb, NP_Encoder
 from models.MGSL_PretrainedFeatEmb.config import MGSL_PretrainedFeatConfig
 from models.MGSL_PretrainedFeatEmb.data_loader import *
 from models.MGSL_PretrainedFeatEmb.GraphMSGenerator import *
@@ -42,7 +42,7 @@ def train_mgsl_pretrained_feat(args):
     stopper = EarlyStopping(patience=cf.early_stop, path=cf.checkpoint_file)
 
     # ! Train Phase 1: Pretrain
-    print(f'>>>> PHASE 1 <<<<< Pretraining node properties...')
+    print('>>>> PHASE 1 <<<<< Pretraining node properties...')
 
     if os.path.exists(cf.pretrain_model_ckpt):
         model.np_encoder.load_state_dict(th.load(cf.pretrain_model_ckpt, map_location=cf.device))
@@ -101,7 +101,7 @@ def train_mgsl_pretrained_feat(args):
     # ! Train Phase 2: Graph Structure Coarse Filtering
     model.coarse_filter_cand_graphs()
     # ! Train Phase 3: Graph Structure Learning
-    print(f'>>>> PHASE 2 <<<<< Graph Structure Learning and Classification')
+    print('>>>> PHASE 2 <<<<< Graph Structure Learning and Classification')
     for epoch in range(cf.epochs):
         t0 = time()
         model.train()
@@ -136,6 +136,7 @@ def train_mgsl_pretrained_feat(args):
 
 
 if __name__ == "__main__":
+    import argparse
     parser = argparse.ArgumentParser("Training settings")
     dataset = 'pubmed'
     dataset = 'citeseer'
