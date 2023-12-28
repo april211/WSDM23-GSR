@@ -37,8 +37,8 @@ python root_to_src_dir/src/models/GSR/trainGSR.py -dcora -l
 ### Model Settings
 
 - `epochs`: The maximum epoch to train in the fine-tuning process.
-- `intra_weight`: The weight of intra contrastive loss, $\alpha$ in the paper.
-- `fsim_weight`: The weight of feature similarity in estimating edge probability, $\beta$ in the paper.
+- `intra_weight`: The weight of intra contrastive loss, $`\alpha`$ in the paper.
+- `fsim_weight`: The weight of feature similarity in estimating edge probability, $`\beta`$ in the paper.
 - `add_ratio`: Percentage of non-existing edge to add in the graph refinement process.
 - `rm_ratio`: Percentage of existing edge to remove in the graph refinement process.
 - `fan_out`: Number of neighbors to sample in first and second order subgraphs.
