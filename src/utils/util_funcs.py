@@ -6,22 +6,23 @@ import numpy as np
 import time
 import datetime
 import pytz
-from utils.proj_settings import SUM_PATH
-
-import socket
+import functools
 
 
 # * ============================= Init =============================
 
 def exp_init(seed, gpu_id):
+    """
+    Use the specified gpu only and set random seed for all related libraries.
+    """
     if gpu_id >= 0:
         os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu_id)
     init_random_state(seed)
-    # Torch related import should be imported afterward setting
+    # ** Torch related import should be imported afterward setting ** 
 
 
 def init_random_state(seed=0):
-    # Libraries using GPU should be imported after specifying GPU-ID
+    # ** Libraries using GPU should be imported after specifying GPU-ID ** 
     import torch
     import random
     import dgl
@@ -32,198 +33,195 @@ def init_random_state(seed=0):
     torch.cuda.manual_seed_all(seed)
 
 
-def time_logger(func):
+# * ============================= Log Related =============================\
+
+def timing(func):
+    """
+    Define a decorator to log the running time of a function. 
+    """
+    @functools.wraps(func)
     def wrapper(*args, **kw):
         start_time = time.time()
         print(f'Start running {func.__name__} at {get_cur_time()}')
         ret = func(*args, **kw)
         print(f'Finished running {func.__name__} at {get_cur_time()}, running time = {time2str(time.time() - start_time)}.')
         return ret
-
     return wrapper
 
 
-def is_runing_on_local():
-    try:
-        host_name = socket.gethostname()
-        if 'MacBook' in host_name:
-            return True
-    except:
-        print("Unable to get Hostname and IP")
-    return False
+def get_subset_dict(dct : dict, sub_keys):
+    """
+    Generate a new dict with only sub_keys.
+    """
+    return {k: dct[k] for k in sub_keys if k in dct}
 
 
-# * ============================= Print Related =============================
-def subset_dict(d, sub_keys):
-    return {k: d[k] for k in sub_keys if k in d}
-
-
-def print_dict(d, end_string='\n\n'):
-    for key in d.keys():
-        if isinstance(d[key], dict):
+def print_dict(dct : dict, end_string='\n\n'):
+    for key in dct.keys():
+        if isinstance(dct[key], dict):
             print('\n', end='')
-            print_dict(d[key], end_string='')
-        elif isinstance(d[key], int):
-            print('{}: {:04d}'.format(key, d[key]), end=', ')
-        elif isinstance(d[key], float):
-            print('{}: {:.4f}'.format(key, d[key]), end=', ')
+            print_dict(dct[key], end_string='')
+        elif isinstance(dct[key], int):
+            print('{}: {:04d}'.format(key, dct[key]), end=', ')
+        elif isinstance(dct[key], float):
+            print('{}: {:.4f}'.format(key, dct[key]), end=', ')
         else:
-            print('{}: {}'.format(key, d[key]), end=', ')
+            print('{}: {}'.format(key, dct[key]), end=', ')
     print(end_string, end='')
 
 
-def block_log():
+def write_nested_dict(dct : dict, path : str):
+    with open(path, 'a+') as f:
+        f.write('\n')
+        for key in dct.keys():
+            if isinstance(dct[key], dict):
+                f.write(str(dct[key]) + '\n')
+
+
+def disable_logs():
     sys.stdout = open(os.devnull, 'w')
     logger = logging.getLogger()
     logger.disabled = True
 
 
 def enable_logs():
-    # Restore
     sys.stdout = sys.__stdout__
     logger = logging.getLogger()
     logger.disabled = False
 
 
-def print_log(log_dict):
+def print_log(log_dict : dict):
     log_ = lambda log: f'{log:.4f}' if isinstance(log, float) else f'{log:04d}'
     print(' | '.join([f'{k} {log_(v)}' for k, v in log_dict.items()]))
 
 
-def mp_list_str(mp_list):
-    return '_'.join(mp_list)
+def list_2_str(lst : list):
+    """
+    Join the elements in a list with '_'.
+    """
+    return '_'.join(lst)
 
 
-# * ============================= File Operations =============================
+# * ============================= Pickle Operations =============================
 
-def write_nested_dict(d, f_path):
-    def _write_dict(d, f):
-        for key in d.keys():
-            if isinstance(d[key], dict):
-                f.write(str(d[key]) + '\n')
-
-    with open(f_path, 'a+') as f:
-        f.write('\n')
-        _write_dict(d, f)
+def load_pickle(path):
+    return pickle.load(open(path, 'rb'))
 
 
-def save_pickle(var, f_name):
-    mkdir_list([f_name])
-    pickle.dump(var, open(f_name, 'wb'))
-    print(f'File {f_name} successfully saved!')
-
-
-def load_pickle(f_name):
-    return pickle.load(open(f_name, 'rb'))
-
-
-def clear_results(dataset, model, exp_name):
-    res_path = f'{SUM_PATH}{dataset}/{model}/{exp_name}/'
-    os.system(f'rm -rf {res_path}')
-    print(f'Results in {res_path} are cleared.')
+def save_pickle(var, path):
+    mkdirs_p([path])
+    pickle.dump(var, open(path, 'wb'))
+    print(f'Pickle `{path}` successfully saved!')
 
 
 # * ============================= Path Operations =============================
 
-def check_path(path):
+def check_path(path : str):
     if not os.path.exists(path):
         os.makedirs(path)
 
 
-def get_dir_of_file(f_name):
-    return os.path.dirname(f_name) + '/'
-
-
-def get_grand_parent_dir(f_name):
+def get_parent_dir(path : str):
     from pathlib import Path
-    if '.' in f_name.split('/')[-1]:  # File
-        return get_grand_parent_dir(get_dir_of_file(f_name))
-    else:  # Path
-        return f'{Path(f_name).parent}/'
+    return Path(path).parent.resolve()
 
 
-def get_abs_path(f_name, style='command_line'):
-    # python 中的文件目录对空格的处理为空格，命令行对空格的处理为'\ '所以命令行相关需 replace(' ','\ ')
-    if style == 'python':
-        cur_path = os.path.abspath(os.path.dirname(__file__))
-    elif style == 'command_line':
-        cur_path = os.path.abspath(os.path.dirname(__file__)).replace(' ', '\ ')
-
-    root_path = cur_path.split('src')[0]
-    return os.path.join(root_path, f_name)
+def get_grand_parent_dir(path : str):
+    return get_parent_dir(get_parent_dir(path))
 
 
-def mkdir_p(path, log=True):
-    """Create a directory for the specified path.
-    Parameters
-    ----------
-    path : str
-        Path name
-    log : bool
-        Whether to print result for directory creation
+def get_abs_path(relavive_path : str):
+    """
+    Get the absolute path of the specified relative path.
+    """
+    root_path = os.path.abspath(os.path.dirname(__file__)).split('src')[0]
+    return os.path.join(root_path, relavive_path)
+
+
+def mkdir_p(abspath : str, verbose=True):
+    """
+    Create necessary directories for the specified abspath. \n
+    verbose : bool
+        Whether to print the process of creating directories.
     """
     import errno
-    if os.path.exists(path): return
-    # print(path)
-    # path = path.replace('\ ',' ')
-    # print(path)
+    if os.path.exists(abspath): 
+        return
     try:
-
-        os.makedirs(path)
-        if log:
-            print('Created directory {}'.format(path))
-    except OSError as exc:
-        if exc.errno == errno.EEXIST and os.path.isdir(path) and log:
-            print('Directory {} already exists.'.format(path))
+        os.makedirs(name=abspath, mode=755)
+        if verbose:
+            print('Created directory {}'.format(abspath))
+    except OSError as e:
+        if e.errno == errno.EEXIST and os.path.isdir(abspath) and verbose:
+            print('Directory {} already exists.'.format(abspath))
         else:
             raise
 
 
-def mkdir_list(p_list, use_relative_path=True, log=True):
-    """Create directories for the specified path lists.
-        Parameters
-        ----------
-        p_list :Path lists
-
+def mkdirs_p(path_list : list, is_relative=True, verbose=True):
     """
-    # ! Note that the paths MUST END WITH '/' !!!
+    Turn a list of paths into a list of absolute paths, then create necessary directories for them. \n
+    If `is_relative` is True, the paths in `path_list` will be relative to the root path of the project. \n
+    """
     root_path = os.path.abspath(os.path.dirname(__file__)).split('src')[0]
-    for p in p_list:
-        p = os.path.join(root_path, p) if use_relative_path else p
-        p = os.path.dirname(p)
-        mkdir_p(p, log)
+    for path in path_list:
+        abspath = os.path.join(root_path, path) if is_relative else path
+        absdir = os.path.dirname(abspath)
+        mkdir_p(absdir, verbose)
 
 
 # * ============================= Time Related =============================
 
-def time2str(t):
-    if t > 86400:
-        return '{:.2f}day'.format(t / 86400)
-    if t > 3600:
-        return '{:.2f}h'.format(t / 3600)
-    elif t > 60:
-        return '{:.2f}min'.format(t / 60)
+def time2str(sec : int):
+    """
+    Convert seconds to a string of format 'xxday' or 'xxh' or 'xxmin' or 'xxs'.
+    """
+    if sec > 86400:
+        return '{:.2f}day'.format(sec / 86400)
+    if sec > 3600:
+        return '{:.2f}h'.format(sec / 3600)
+    elif sec > 60:
+        return '{:.2f}min'.format(sec / 60)
     else:
-        return '{:.2f}s'.format(t)
+        return '{:.2f}s'.format(sec)
 
 
-def get_cur_time(timezone='Asia/Shanghai', t_format='%m-%d %H:%M:%S'):
+def get_cur_time(timezone='Asia/Shanghai', t_format='%y-%m-%d, %H:%M:%S'):
+    """
+    Get current time in the specified timezone and format.
+    """
     return datetime.datetime.fromtimestamp(int(time.time()), pytz.timezone(timezone)).strftime(t_format)
 
 
 class Dict2Config():
     """
-    Dict2Config: convert dict to a config object for better attribute acccessing
+    Convert dict to a config object for better attribute acccessing.
     """
-
     def __init__(self, conf):
-        self.__dict__.update(conf)
+        self.__dict__.update(conf)      # convert conf dict to object attributes
 
 
 # * ============================= Itertool Related =============================
 
-def lot_to_tol(list_of_tuple):
-    # list of tuple to tuple lists
-    # Note: zip(* zipped_file) is an unzip operation
-    return map(list, zip(*list_of_tuple))
-# * ============================= Torch Related =============================
+def zip_tuples(list_of_tuples : list):
+    """
+    Zip a list of tuples, then convert them to a map of lists.
+    """
+    return map(list, zip(*list_of_tuples))
+
+
+if __name__ == '__main__':
+
+    # test for lot_to_tol
+    a = [(1, 2), (3, 4), (5, 6)]
+    for idx, lst in enumerate(zip_tuples(a)):
+        print(idx, lst)
+
+    # test for get_parent_dir
+    print(get_parent_dir("/home/wgk/"))
+    print(get_parent_dir("/home/wgk/Git_Repositories/WSDM23-GSR/src/utils/util_funcs.py"))
+
+    # test for get_grand_parent_dir
+    print(get_grand_parent_dir("/home/wgk/"))
+    print(get_grand_parent_dir("/home/wgk/Git_Repositories/WSDM23-GSR/src/utils/util_funcs.py"))
+
