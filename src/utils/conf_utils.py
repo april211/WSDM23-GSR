@@ -3,7 +3,7 @@ from abc import abstractmethod, ABCMeta
 from utils.proj_settings import RES_PATH
 
 
-class ModelConfig(metaclass=ABCMeta):
+class ModelConfigABS(metaclass=ABCMeta):
     """
     The ModelConfig class is an abstract base class \
     that cannot be instantiated on its own and is expected to be a blueprint for other classes.
