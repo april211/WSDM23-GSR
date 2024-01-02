@@ -71,11 +71,13 @@ def print_dict(dct : dict, end_string='\n\n'):
 
 
 def write_nested_dict(dct : dict, path : str):
+    mkdirs_p([path])
     with open(path, 'a+') as f:
         f.write('\n')
         for key in dct.keys():
             if isinstance(dct[key], dict):
                 f.write(str(dct[key]) + '\n')
+    print(path)
 
 
 def disable_logs():
@@ -144,18 +146,15 @@ def mkdir_p(abspath : str, verbose=True):
     verbose : bool
         Whether to print the process of creating directories.
     """
-    import errno
     if os.path.exists(abspath): 
         return
-    try:
-        os.makedirs(name=abspath, mode=755)
-        if verbose:
-            print('Created directory {}'.format(abspath))
-    except OSError as e:
-        if e.errno == errno.EEXIST and os.path.isdir(abspath) and verbose:
-            print('Directory {} already exists.'.format(abspath))
-        else:
-            raise
+    
+    # fix the permission issue of creating directories.
+    os.umask(0)
+    os.makedirs(name=abspath, mode=0o755, exist_ok=False)
+
+    if verbose:
+        print('Created directory {}'.format(abspath))
 
 
 def mkdirs_p(path_list : list, is_relative=True, verbose=True):
@@ -212,6 +211,8 @@ def zip_tuples(list_of_tuples : list):
 
 if __name__ == '__main__':
 
+    from proj_settings import TEST_PATH
+
     # test for lot_to_tol
     a = [(1, 2), (3, 4), (5, 6)]
     for idx, lst in enumerate(zip_tuples(a)):
@@ -224,4 +225,8 @@ if __name__ == '__main__':
     # test for get_grand_parent_dir
     print(get_grand_parent_dir("/home/wgk/"))
     print(get_grand_parent_dir("/home/wgk/Git_Repositories/WSDM23-GSR/src/utils/util_funcs.py"))
+
+    # test for write_nested_dict
+    dct = {'a': 1, 'b': {'b1': 2, 'b2': 2}, 'c': {'c1': 3, 'c2': 3}}
+    write_nested_dict(dct, f'{TEST_PATH}test_for_write_nested_dict.txt')
 
