@@ -1,9 +1,10 @@
 # ! Project Settings
 RES_PATH = 'temp_results/'
-SUM_PATH = 'results/'
+SUM_PATH = 'summaries/'
 LOG_PATH = 'log/'
 TEMP_PATH = 'temp/'
 DATA_PATH = 'data/'
+TEST_PATH = 'test/'
 
 EVAL_METRIC = 'test_acc'
 P_EPOCHS_SAVE_LIST = [1, 2, 3, 5, 10, 20, 30, 40, 50, 100, 150, 200, 250, 300]
