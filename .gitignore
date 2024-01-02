@@ -1,4 +1,5 @@
 __MACOSX/
 data/
+test/
 *.pyc
 
