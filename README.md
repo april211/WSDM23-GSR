@@ -17,6 +17,12 @@ Please kindly note that this work is inspired by the great work [GAuG](https://a
 - scikit-learn == 1.3.2 
 - tqdm == 4.66.1 
 - openke from: https://github.com/thunlp/OpenKE (SHA: d70ee89f803adcf923550aa538d1850614c7ab6a)
+- ogb == 1.3.6
+- ipykernel == 6.28.0 
+- ipython == 8.12.3 
+- jupyter-core == 5.6.1
+- jupyterlab == 4.0.10 
+- matplotlib == 3.7.4
 
 ## Usage
 
