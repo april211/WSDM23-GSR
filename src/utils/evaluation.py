@@ -1,6 +1,5 @@
-import pickle
 import torch
-import utils.util_funcs as uf
+import utils.util_funcs as util_funcs
 
 
 def eval_classification(pred, target, n_class):
@@ -67,12 +66,13 @@ def eval_classification(pred, target, n_class):
     return acc, ma_f1.item(), mi_f1.item()
 
 
-def eval_logits(logits, target_x, target_y):
-    pred_y = torch.argmax(logits[target_x], dim=1)
+def eval_logits(logits, target_idx, target_y):
+    pred_y = torch.argmax(logits[target_idx], dim=1)
     return eval_classification(pred_y, target_y, n_class=logits.shape[1])
 
 
 def save_results(cf, res_dict):
     print(f'\nTrain seed{cf.seed} finished\nResults:{res_dict}\nConfig: {cf}')
     res_dict = {'parameters': cf.model_conf, 'res': res_dict}
-    uf.write_nested_dict(res_dict, cf.res_file)
+    util_funcs.write_nested_dict(res_dict, cf.res_file)
+
