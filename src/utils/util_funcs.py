@@ -93,8 +93,8 @@ def enable_logs():
 
 
 def print_log(log_dict : dict):
-    log_ = lambda log: f'{log:.4f}' if isinstance(log, float) else f'{log:04d}'
-    print(' | '.join([f'{k} {log_(v)}' for k, v in log_dict.items()]))
+    log_formatter = lambda log: f'{log:.4f}' if isinstance(log, float) else f'{log:04d}'
+    print(' | '.join([f'{k} {log_formatter(v)}' for k, v in log_dict.items()]))
 
 
 def list_2_str(lst : list):
