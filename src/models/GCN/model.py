@@ -12,15 +12,17 @@ import torch.nn.functional as F
 
 
 class GCN(nn.Module):
-    def __init__(self, in_feats, n_hidden, n_classes, n_layers, dropout_prob):
+    def __init__(self, in_feats, n_hidden, n_classes, n_layers, activation, dropout_prob):
         super(GCN, self).__init__()
 
         self.training = None
 
         self.layers = nn.ModuleList()
         self.bns = torch.nn.ModuleList()
+        self.activation = activation
 
         # input layer
+        # Set activation to None first to allow batchnorm to work.
         self.layers.append(GraphConv(in_feats, n_hidden, activation=None))
         self.bns.append(torch.nn.BatchNorm1d(n_hidden))
 
@@ -39,7 +41,7 @@ class GCN(nn.Module):
         for i, conv in enumerate(self.layers[:-1]):
             x = conv(g, x)
             x = self.bns[i](x)
-            x = F.relu(x)
+            x = self.activation(x)
             x = F.dropout(x, p=self.dropout_prob, training=self.training)
         
         x = self.layers[-1](g, x)
