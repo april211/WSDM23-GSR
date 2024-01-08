@@ -73,15 +73,16 @@ def preprocess_data(dataset_name, train_percentage):
         labels = np.loadtxt(f'{DATA_PATH}/{dataset_name}/{dataset_name}.label', dtype=int)
 
         if load_default_split:
-            train = np.loadtxt(f'{DATA_PATH}/{dataset_name}/{dataset_name}.train', dtype=int)
-            val = np.loadtxt(f'{DATA_PATH}/{dataset_name}/{dataset_name}.val', dtype=int)
-            test = np.loadtxt(f'{DATA_PATH}/{dataset_name}/{dataset_name}.test', dtype=int)
+            train_idx = np.loadtxt(f'{DATA_PATH}/{dataset_name}/{dataset_name}.train', dtype=int)
+            val_idx = np.loadtxt(f'{DATA_PATH}/{dataset_name}/{dataset_name}.val', dtype=int)
+            test_idx = np.loadtxt(f'{DATA_PATH}/{dataset_name}/{dataset_name}.test', dtype=int)
         else:
-            train, val, test = stratified_train_test_split(np.arange(len(labels)), labels, len(labels), train_percentage)
+            train_idx, val_idx, test_idx = stratified_train_test_split(np.arange(len(labels)), 
+                                                                labels, len(labels), train_percentage)
         
-        nclass = len(set(labels.tolist()))
+        n_class = len(set(labels.tolist()))
 
-        print(dataset_name, nclass)
+        print(dataset_name, n_class)
 
         U = [e[0] for e in edge]
         V = [e[1] for e in edge]
@@ -94,9 +95,9 @@ def preprocess_data(dataset_name, train_percentage):
 
         features =torch.FloatTensor(features)
         labels = torch.LongTensor(labels)
-        train = torch.LongTensor(train)
-        val = torch.LongTensor(val)
-        test = torch.LongTensor(test)
+        train_idx = torch.LongTensor(train_idx)
+        val_idx = torch.LongTensor(val_idx)
+        test_idx = torch.LongTensor(test_idx)
 
     elif dataset_name in ['airport', 'blogcatalog', 'flickr']:
         load_default_split = train_percentage <= 0
@@ -115,14 +116,14 @@ def preprocess_data(dataset_name, train_percentage):
             # `tvt_nids` contains 3 arrays: train(0), val(1), test(2)
             tvt_nids = pickle.load(open(f'{DATA_PATH}/{dataset_name}/{dataset_name}_tvt_nids.pkl', 'rb'))  
             
-            train = tvt_nids[0]
-            val = tvt_nids[1]
-            test = tvt_nids[2]
+            train_idx = tvt_nids[0]
+            val_idx = tvt_nids[1]
+            test_idx = tvt_nids[2]
         else:
-            train, val, test = stratified_train_test_split(np.arange(len(labels)), labels, len(labels),
+            train_idx, val_idx, test_idx = stratified_train_test_split(np.arange(len(labels)), labels, len(labels),
                                                            train_percentage)
-        nclass = len(set(labels.tolist()))
-        print(dataset_name, nclass)
+        n_class = len(set(labels.tolist()))
+        print(dataset_name, n_class)
 
         adj_orig = adj_orig.tocoo()
         U = adj_orig.row.tolist()
@@ -142,9 +143,9 @@ def preprocess_data(dataset_name, train_percentage):
             features = torch.FloatTensor(features)
 
         labels = torch.LongTensor(labels)
-        train = torch.LongTensor(train)
-        val = torch.LongTensor(val)
-        test = torch.LongTensor(test)
+        train_idx = torch.LongTensor(train_idx)
+        val_idx = torch.LongTensor(val_idx)
+        test_idx = torch.LongTensor(test_idx)
 
     elif dataset_name in ['arxiv']:
         # Get the ogbn-arxiv dataset object.
@@ -152,12 +153,12 @@ def preprocess_data(dataset_name, train_percentage):
 
         # Use the default split.
         split_idx = dataset_obj.get_idx_split()
-        train, val, test = split_idx["train"], split_idx["valid"], split_idx["test"]
+        train_idx, val_idx, test_idx = split_idx["train"], split_idx["valid"], split_idx["test"]
         
         # Use index `0` to get the only graph in the dataset.
         g, labels = dataset_obj[0]
         features = g.ndata['feat']
-        nclass = 40
+        n_class = 40
         labels = labels.squeeze()
         g = dgl.to_simple(g)
         g = dgl.remove_self_loop(g)
@@ -167,7 +168,7 @@ def preprocess_data(dataset_name, train_percentage):
     if dataset_name in ['citeseer']:
         g = dgl.add_self_loop(g)
     
-    return g, features, features.shape[1], nclass, labels, train, val, test
+    return g, features, features.shape[1], n_class, labels, train_idx, val_idx, test_idx
 
 
 # * ============================= Torch =============================
