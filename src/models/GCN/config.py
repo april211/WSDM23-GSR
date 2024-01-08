@@ -1,8 +1,8 @@
-from utils.conf_utils import ModelConfig
+from utils.conf_utils import ModelConfigABS
 from utils.proj_settings import TEMP_PATH
 
 
-class GCNConfig(ModelConfig):
+class GCNConfig(ModelConfigABS):
 
     def __init__(self, args):
         super(GCNConfig, self).__init__('GCN')
@@ -28,3 +28,4 @@ class GCNConfig(ModelConfig):
     @property
     def checkpoint_file(self):
         return f"{TEMP_PATH}{self.model}/{self.dataset}/{self.f_prefix}.ckpt"
+
