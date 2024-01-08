@@ -8,12 +8,11 @@ sys.path.append(root_path + 'src')
 
 # ! IMPORTANT NOTES
 # ! These functions shan't use cuda related packages, since it will cause wrong assignment of GPU-ID
-from .util_funcs import exp_init, time_logger, print_log, is_runing_on_local
+from .util_funcs import exp_init, timing, print_log
 from .proj_settings import *
-from .conf_utils import SimpleObject
+from .conf_utils import Dict2Config
 from .tune_utils import Tuner
 
 import argparse
 from time import time
-
 
