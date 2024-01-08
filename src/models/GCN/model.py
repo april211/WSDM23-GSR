@@ -10,27 +10,38 @@ import torch.nn as nn
 from dgl.nn.pytorch import GraphConv
 import torch.nn.functional as F
 
+
 class GCN(nn.Module):
-    def __init__(self, g, in_feats, n_hidden, n_classes, n_layers, activation, dropout):
+    def __init__(self, in_feats, n_hidden, n_classes, n_layers, dropout_prob):
         super(GCN, self).__init__()
+
+        self.training = None
+
         self.layers = nn.ModuleList()
         self.bns = torch.nn.ModuleList()
+
         # input layer
         self.layers.append(GraphConv(in_feats, n_hidden, activation=None))
         self.bns.append(torch.nn.BatchNorm1d(n_hidden))
+
         # hidden layers
-        for i in range(n_layers - 1):
+        for _ in range(n_layers - 1):
             self.layers.append(GraphConv(n_hidden, n_hidden, activation=None))
             self.bns.append(torch.nn.BatchNorm1d(n_hidden))
+        
         # output layer
         self.layers.append(GraphConv(n_hidden, n_classes))
-        self.dropout = dropout
 
-    def forward(self,g, x):
+        # dropout
+        self.dropout_prob = dropout_prob
+
+    def forward(self, g, x):
         for i, conv in enumerate(self.layers[:-1]):
             x = conv(g, x)
             x = self.bns[i](x)
             x = F.relu(x)
-            x = F.dropout(x, p=self.dropout, training=self.training)
+            x = F.dropout(x, p=self.dropout_prob, training=self.training)
+        
         x = self.layers[-1](g, x)
         return x.log_softmax(dim=-1)
+
