@@ -96,7 +96,7 @@ class ModelConfigABS(metaclass=ABCMeta):
         util_funcs.mkdirs_p([getattr(self, _) for _ in self._file_conf_list])
 
 
-class Dict2Config():
+class Dict2Attrs():
     """
     Dict2Config: convert dict to a config object for better attribute acccessing
     """
