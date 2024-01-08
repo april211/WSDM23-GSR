@@ -10,8 +10,16 @@ class EarlyStopping:
         self.counter = 0
         self.best_score = None
         self.best_epoch = None
+        self.best_model = None
         self.should_stop = False
         self.ckpoint_path = ckpoint_path
+
+    def _update_best_record(self, score, epoch, model):
+        self.counter = 0
+        self.best_score = score
+        self.best_epoch = epoch
+        self.best_model = model
+        self.save_checkpoint(model)
 
     def step(self, acc, model, epoch):
         """
@@ -19,9 +27,7 @@ class EarlyStopping:
         """
         score = acc
         if self.best_score is None:
-            self.best_score = score
-            self.best_epoch = epoch
-            self.save_checkpoint(model)
+            self._update_best_record(score, epoch, model)
         elif score < self.best_score:
             self.counter += 1
             print(
@@ -29,10 +35,7 @@ class EarlyStopping:
             if self.counter >= self.patience:
                 self.should_stop = True
         else:
-            self.best_score = score
-            self.best_epoch = epoch
-            self.save_checkpoint(model)
-            self.counter = 0
+            self._update_best_record(score, epoch, model)
 
         return self.should_stop
 
