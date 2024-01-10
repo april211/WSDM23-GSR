@@ -1,11 +1,11 @@
-from utils.conf_utils import ModelConfig
+from utils.conf_utils import ModelConfigABS
 from utils.proj_settings import TEMP_PATH
 
 
-class GraphSageConfig(ModelConfig):
+class GraphSAGEConfig(ModelConfigABS):
 
     def __init__(self, args):
-        super(GraphSageConfig, self).__init__('GraphSage')
+        super(GraphSAGEConfig, self).__init__('GraphSAGE')
         # ! Model settings
         self.dataset = args.dataset
         self.lr = 0.01
