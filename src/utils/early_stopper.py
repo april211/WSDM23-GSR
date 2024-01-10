@@ -21,11 +21,10 @@ class EarlyStopping:
         self.best_model = model
         self.save_checkpoint(model)
 
-    def step(self, acc, model, epoch):
+    def step(self, score, model, epoch):
         """
         Return True if should stop training (exceed patience).
         """
-        score = acc
         if self.best_score is None:
             self._update_best_record(score, epoch, model)
         elif score < self.best_score:
