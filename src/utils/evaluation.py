@@ -1,6 +1,14 @@
 import torch
 import utils.util_funcs as util_funcs
+from pprint import pformat
 
+
+def logits_2_probs(logits):
+    return torch.softmax(logits, dim=-1)
+
+def logits_2_pred(logits):
+    probs = logits_2_probs(logits)
+    return torch.argmax(probs, dim=-1)
 
 def true_positive(pred, target, n_class):
         return torch.tensor([((pred == i) & (target == i)).sum()
@@ -83,7 +91,7 @@ def eval_logits(logits, target_idx, target_y):
 
 
 def save_results(cf, res_dict):
-    print(f'\nTrain seed{cf.seed} finished\nResults:{res_dict}\nConfig: {cf}')
-    nested_dct = {'parameters': cf.model_conf, 'res': res_dict}
+    print(f'\nTrain seed `{cf.seed}` finished\nResults: {res_dict} \nConfig: \n{pformat(cf.get_parameter_dict())}\n')
+    nested_dct = {'parameters': cf.get_parameter_dict(), 'res': res_dict}
     util_funcs.write_nested_dict(nested_dct, cf.res_file)
 
