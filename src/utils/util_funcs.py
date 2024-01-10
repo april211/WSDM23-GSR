@@ -13,11 +13,19 @@ import functools
 
 def exp_init(seed, gpu_id):
     """
-    Use the specified gpu only and set random seed for all related libraries.
+    Specify the gpu and set random seed for all related libraries.
     """
     if gpu_id >= 0:
         os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu_id)
+    
+    # Choose the first gpu you specified above.
+    # https://discuss.pytorch.org/t/os-environ-cuda-visible-devices-does-not-work-well/132461/8
+    import torch
+    device = torch.device("cuda:0" if gpu_id >= 0 else "cpu")
+
     init_random_state(seed)
+    return device
+
     # ** Torch related import should be imported afterward setting ** 
 
 
@@ -77,7 +85,7 @@ def write_nested_dict(dct : dict, path : str):
         for key in dct.keys():
             if isinstance(dct[key], dict):
                 f.write(str(dct[key]) + '\n')
-    print(path)
+    print(f"Write the nested dict into: `{path}`.")
 
 
 def disable_logs():
