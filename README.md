@@ -8,7 +8,7 @@ Please kindly note that this work is inspired by the great work [GAuG](https://a
 - Ubuntu 23.10
 - Python == 3.8.5
 - Pytorch == 1.8.1+cu111
-- DGL == 0.6.2      <!-- I can't find a version of 0.6.2, so I use 0.6.1 instead... -->
+- DGL == cu111-0.6.1      <!-- I can't find a version of 0.6.2, so I use 0.6.1 instead... -->
 - SciPy == 1.6.2
 - NetworkX == 2.5.1
 - pytz == 2023.3.post1
@@ -23,6 +23,7 @@ Please kindly note that this work is inspired by the great work [GAuG](https://a
 - jupyter-core == 5.6.1
 - jupyterlab == 4.0.10 
 - matplotlib == 3.7.4
+- gensim == 4.2.0
 
 ## Usage
 
