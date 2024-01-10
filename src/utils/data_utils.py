@@ -8,6 +8,7 @@ import numpy as np
 import scipy.sparse as sp
 import torch
 import torch.nn.functional as F
+import dgl
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 import pickle
@@ -15,6 +16,16 @@ from ogb.nodeproppred import DglNodePropPredDataset
 
 import utils.util_funcs as util_funcs
 from utils.proj_settings import *
+
+
+def get_stochastic_loader(g, train_nids, batch_size, num_workers):
+    sampler = dgl.dataloading.MultiLayerFullNeighborSampler(2)
+    return dgl.dataloading.NodeDataLoader(
+        g.cpu(), train_nids, sampler,
+        batch_size=batch_size,
+        shuffle=True,
+        drop_last=False,
+        num_workers=num_workers)
 
 
 def graph_normalization(g, cuda):
@@ -165,6 +176,9 @@ def preprocess_data(dataset_name, train_percentage):
         g = dgl.to_bidirected(g)
     
     # ** Add self loop only for citeseer dataset. **  ?
+    # Zero in-degree nodes will lead to invalid output value. 
+    # This is because no message will be passed to those nodes, the aggregation function will be appied on empty input. 
+    # https://docs.dgl.ai/en/1.1.x/generated/dgl.nn.mxnet.conv.GraphConv.html
     if dataset_name in ['citeseer']:
         g = dgl.add_self_loop(g)
     

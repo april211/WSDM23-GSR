@@ -3,12 +3,11 @@ from abc import abstractmethod, ABCMeta
 
 import torch
 
+from utils.data_utils import get_stochastic_loader
 from utils.util_funcs import print_log
-from utils.evaluation import eval_classification, save_results, accuracy
+from utils.evaluation import eval_classification, save_results, accuracy, logits_2_pred
 from utils.early_stopper import EarlyStopping
 from utils.conf_utils import ModelConfigABS
-
-from models.GSR.data_utils import get_stochastic_loader
 # Copyright
 
 
@@ -21,7 +20,7 @@ class NodeClassificationExpABC(metaclass=ABCMeta):
         self.optimizer = optimizer
         self.stopper : EarlyStopping = stopper
         self.loss_func = loss_func
-        self.evaluator = accuracy
+        self.evaluator = lambda logits, target: accuracy(logits_2_pred(logits), target)
 
         self.cf : ModelConfigABS = cf
         self.device = cf.device
@@ -61,8 +60,8 @@ class NodeClassificationExpABC(metaclass=ABCMeta):
             
             if self.stopper is not None:
                 if self.stopper.step(val_acc, self.model, epoch):
-                    print(f'Early stopped at epoch {epoch}, \
-                                will return the best model from epoch {self.stopper.best_epoch}.')
+                    print(f"Early stopped at epoch {epoch}, " + 
+                          f"will return the best model from epoch {self.stopper.best_epoch}.")
                     break
         
         if self.stopper is not None:
@@ -84,9 +83,9 @@ class NodeClassificationExpABC(metaclass=ABCMeta):
         save_results(self.cf, res_dict)
 
 
-class FullBatchExp(NodeClassificationExpABC):
+class FullBatchNCExp(NodeClassificationExpABC):
     def __init__(self, **kwargs):
-        super(FullBatchExp, self).__init__(**kwargs)
+        super(FullBatchNCExp, self).__init__(**kwargs)
         self.g = self.g.to(self.device)
         self.features = self.features.to(self.device)
 
@@ -109,9 +108,9 @@ class FullBatchExp(NodeClassificationExpABC):
         return val_acc, test_acc
 
 
-class StochasticExp(NodeClassificationExpABC):
+class StochasticNCExp(NodeClassificationExpABC):
     def __init__(self, **kwargs):
-        super(StochasticExp, self).__init__(**kwargs)
+        super(StochasticNCExp, self).__init__(**kwargs)
         self.train_loader = get_stochastic_loader(self.g, self.train_idx.cpu(), self.cf.cla_batch_size, self.cf.num_workers)
         self.val_loader = get_stochastic_loader(self.g, self.val_idx.cpu(), self.cf.cla_batch_size, self.cf.num_workers)
         self.test_loader = get_stochastic_loader(self.g, self.test_idx.cpu(), self.cf.cla_batch_size, self.cf.num_workers)
