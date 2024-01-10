@@ -8,9 +8,9 @@ from itertools import product
 from pprint import pformat
 from copy import deepcopy
 
-from utils.util_funcs import get_cur_time, timing, Dict2Config, disable_logs,\
-                     enable_logs, time2str, mkdirs_p, get_subset_dict, write_nested_dict
-from utils.proj_settings import EVAL_METRIC, SUM_PATH, RES_PATH
+from .util_funcs import get_cur_time, timing, disable_logs,\
+                     enable_logs, time2str, mkdirs_p, write_nested_dict
+from .proj_settings import EVAL_METRIC, SUM_PATH, RES_PATH
 
 
 class Tuner():
@@ -24,70 +24,56 @@ class Tuner():
     ✅ Try-catch function to deal with bugs \n
     ✅ Tune report to txt.
     """
-    def __init__(self, exp_args, search_dict : dict, default_dict : dict = None):
+    def __init__(self, model_config_obj, train_func, search_dict : dict, default_dict : dict = None):
         """
-        TODO Explain the meaning of parameters: `exp_args`, `search_dict`, `default_dict`.
+        Explain the meaning of parameters: `exp_config`, `search_dict`, `default_dict`.
+        """
 
-        `exp_args` : Experiment config. an object? should include `self.tune_global_cf`.
-        `search_dict` : Grid search parameters. 
-            `search_dict['data_spec_configs']` : utils.proj_settings.PARA_DICT? 
-        `default_dict` : some default & additional parameters / configs? 
-        """
+        self.model_config_obj = model_config_obj
+
         self.birth_time = get_cur_time()
-        self.__dict__.update(exp_args.__dict__)         # contains `dataset`, `exp_name`, `model_config`
-        self.tune_global_config_list = ['run_times', 'start_ind', 'reverse_iter',
-                          'model', 'model_config', 'train_func', 'log_on', 'birth_time']
 
-        self._d = deepcopy(default_dict) if default_dict is not None else {}
-
-        # Transfer `search_dict['data_spec_configs']` from search_dict to self._d.
+        # self._d: hyper-parameters to be tuned.
+        self.hyperparam_dict = deepcopy(default_dict) if default_dict is not None else {}
         if 'data_spec_configs' in search_dict:
             self.update_dataset_specific_configs(search_dict['data_spec_configs'])
-        search_dict.pop('data_spec_configs')
-        
-        # self._d: default_dict | search_dict['data_spec_configs'] + search_dict remaining k:v
-        self._d.update(search_dict)
+            search_dict.pop('data_spec_configs')
+        self.hyperparam_dict.update(search_dict)        
 
-        self.log_on = True
+        # Set the training function.
+        self.train_func = train_func
+
+        # Get the experiment configs for printing, excluding the pre-defined params in `XXConfig`.
+        excluded_config_list = ['seed'] + list(self.hyperparam_dict.keys())
+        self.global_config_list = []
+        for config in self.model_config_obj.__dict__:
+            if config not in excluded_config_list:
+                self.global_config_list.append(config)
 
     def update_dataset_specific_configs(self, dct : dict):
         for k, v in dct.items():
-            self._d.update({k: v[self.dataset]})
+            self.hyperparam_dict.update({k: v[self.model_config_obj.dataset]})
+        self.hyperparam_dict = dict(sorted(self.hyperparam_dict.items()))
     
     def __str__(self):
-        return f'\nExperiment configs: {pformat(self.tune_config_dict)}\n' \
-               f'\nGrid search parameters: {pformat(self._d)}\n' \
-               f'\ntune_param_df: {self.tune_param_df}\n'
+        gf_dct = self.model_config_obj.get_sub_conf_dict(self.global_config_list)
+        return f'\nGlobal configs: \n{pformat(gf_dct)}\n' \
+               f'\nGrid search params: \n{pformat(self.hyperparam_dict)}\n'
     
     # * ============================= Properties =============================
 
     @property
-    def tune_config_dict(self):
+    def hyper_param_df(self):
         """
-        A dict includes `exp_args`.
-
-        tune_config_dict.keys() := tune_global_config_list + trial_config_dict.keys()
-        """
-        return {k: v for k, v in self.__dict__.items() if k[0] != '_'}      # ignore hyper-parameters
-
-    @property
-    def trial_config_dict(self):
-        """
-        Trial configs: configs for each trial, ignoring the global configs.
-        """
-        return {k: self.tune_config_dict[k] for k in self.tune_config_dict if k not in self.tune_global_config_list}
-
-    @property
-    def tune_param_df(self):
-        """
+        Generate dataframe from `self._d`.
         Each row of this dataframe stands for a trial (hyper-parameter combination).
         """
         # convert the values of parameters to list
         # param_name : [param_value1, param_value2, ...]
-        for param in self._d.keys():
-            if not isinstance(self._d[param], list):
-                self._d[param] = [self._d[param]]
-        return pd.DataFrame.from_records(dict_product(self._d))
+        for param in self.hyperparam_dict.keys():
+            if not isinstance(self.hyperparam_dict[param], list):
+                self.hyperparam_dict[param] = [self.hyperparam_dict[param]]
+        return pd.DataFrame.from_records(dict_product(self.hyperparam_dict))
 
     # * ============================= Tuning =============================
 
@@ -99,50 +85,53 @@ class Tuner():
         print(self)
 
         failed_trials_num, skipped_trials_num, finished_trials_num = 0, 0, 0
-        total_trials_num = len(self.tune_param_df) - self.start_ind
+        total_trials_num = len(self.hyper_param_df) - self.model_config_obj.start_ind
 
-        tune_dict_list = self.tune_param_df.to_dict('records')
+        tune_dict_list = self.hyper_param_df.to_dict('records')
         
         outer_start_time = time.time()
 
         # skip the 0 ~ `self.start_ind` trials
-        for seq_cnt in range(self.start_ind, len(tune_dict_list)):
+        for seq_cnt in range(self.model_config_obj.start_ind, len(tune_dict_list)):
 
             # `trial_idx` can start from the tail of `tune_dict_list` or the head of `tune_dict_list`.
-            trial_idx = len(tune_dict_list) - seq_cnt - 1 if self.reverse_iter else seq_cnt
+            trial_idx = len(tune_dict_list) - seq_cnt - 1 if self.model_config_obj.reverse_iter else seq_cnt
 
-            # Get the current trial's hyper-parameters.
-            param_dict = deepcopy(self.trial_config_dict)
-            param_dict.update(tune_dict_list[trial_idx])
+            # Get the current trial's hyper-parameters & update the predefined parameters.
+            self.model_config_obj.__dict__.update(tune_dict_list[trial_idx])
 
             inner_start_time = time.time()
 
-            print(f'\n{seq_cnt}/{len(tune_dict_list)} <{self.exp_name}> Start tuning: {param_dict}, {get_cur_time()}')
+            print(f"\n{seq_cnt}/{len(tune_dict_list)} <{self.model_config_obj.exp_name}> " + 
+                  f"Start tuning: \n{pformat(self.model_config_obj.get_parameter_dict())}, " + 
+                  f"\ncurrent time: {get_cur_time()}")
 
-            res_file = self.model_config(Dict2Config(param_dict)).res_file
+            res_file = self.model_config_obj.res_file
             if can_skip_trial(res_file):
                 total_trials_num -= 1
                 skipped_trials_num += 1
             else:
                 try:
                     # Try all avaliable seeds and rerun `run_times` for `calc_mean_std`.
-                    for seed in range(self.run_times):          
+                    for seed in range(self.model_config_obj.run_times):          
 
                         # Note that seed has been changed here! 
                         # But `f_prefix` doesn't include `seed`, so the results will be saved to the same file.
-                        param_dict['seed'] = seed
+                        self.model_config_obj.seed = seed
 
-                        if not self.log_on:
+                        if not self.model_config_obj.log_on:
                             disable_logs()
                         else:
                             enable_logs()
                         
                         # Perform model tuning & record results to `res_file`.
-                        cf = self.train_func(Dict2Config(param_dict))
+                        # Note: this process will add/update some attrs in `self.model_config_obj`.
+                        self.model_config_obj = self.train_func(self.model_config_obj, 
+                                                                        display_params=False)
                         
                         # `seed + 1` to avoid zero division.
-                        iter_time_estimate(f'\tSeed {seed}/{self.run_times}', '',
-                                           inner_start_time, seed + 1, self.run_times)
+                        iter_time_estimate(f'\n\tSeed {seed}/{self.model_config_obj.run_times}', '',
+                                           inner_start_time, seed + 1, self.model_config_obj.run_times)
                     
                     finished_trials_num += 1
                     iter_time_estimate(f'------ Trial {trial_idx} finished, ', '------',
@@ -150,18 +139,18 @@ class Tuner():
                 except Exception as e:
 
                     # Create a log file for the bug report.
-                    log_file = f'log/{self.model}-{self.dataset}-{self.exp_name}-{self.birth_time}.log'
+                    log_file = f'log/{self.model_config_obj.model}-{self.model_config_obj.dataset}-{self.model_config_obj.exp_name}-{self.birth_time}.log'
                     mkdirs_p([log_file])
 
-                    # Write the error message to the log file.
+                    # TODO Write the error message to the log file.
                     error_msg = ''.join(traceback.format_exception(None, e, e.__traceback__))
                     with open(log_file, 'a+') as f:
                         f.write(
-                            f'\nTrial failed at {get_cur_time()} while running {param_dict} at seed {seed}, error message:{error_msg}\n')
+                            f'\nTrial failed at {get_cur_time()} while running \n{pformat(self.hyperparam_dict)}\n at seed {seed}, error message:{error_msg}\n')
                         f.write(f'{"-" * 100}')
 
                     # If the log is disabled, enable it.
-                    if not self.log_on: 
+                    if not self.model_config_obj.log_on: 
                         enable_logs()
                     
                     # Print the error message on the screen.
@@ -170,7 +159,7 @@ class Tuner():
                     continue
                 
                 # calculate mean and std value for this set of hyper-parameters (w.r.t different seeds)
-                calc_mean_std(cf.res_file)
+                calc_mean_std(self.model_config_obj.res_file)
         
         print(f'\n{"="* 24 + " Grid Search Finished! " + "="* 24}\n'
               f'Successfully run {finished_trials_num} trials, skipped {skipped_trials_num} previous trials,'
@@ -185,17 +174,23 @@ class Tuner():
         Summarize all the trials' results to a single file.
         One should use this function to summarize the results of **current** percentage setting.
         """
-        exp_name, model, dataset, train_percentage = self.exp_name, self.model, \
-                                                self.dataset, self.train_percentage
+        exp_name = self.model_config_obj.exp_name
+        model = self.model_config_obj.model
+        dataset = self.model_config_obj.dataset
+        train_percentage = self.model_config_obj.train_percentage
+
         res_file_list = self.tune_df_to_flist()
+
         out_prefix = f'{SUM_PATH}{model}/{dataset}/{model}_{dataset}<l{train_percentage:02d}><{exp_name}>'
-        print(f'\n\nSummarizing expriment {self.exp_name}... ')
+        print(f'\n\nSummarizing expriment {exp_name}... ')
 
         try:
             sum_file = res_to_excel(res_file_list, out_prefix, f'avg_{metric}')
-            print(f'Summary of {self.exp_name} finished. It have been saved to `{sum_file}`.')
-        except:
-            print(f"!!!!!!Can't summarize {self.exp_name}!!!!!!")
+            print(f'Summary of {exp_name} finished. It have been saved to `{sum_file}`.')
+        except Exception as e:
+            error_msg = ''.join(traceback.format_exception(None, e, e.__traceback__))
+            print(error_msg)
+            print(f"!!!!!!Can't summarize {exp_name}!!!!!!")
 
 
     def tune_df_to_flist(self):
@@ -203,23 +198,22 @@ class Tuner():
         Return a list of result files corresponding to the tuning dataframe.
         """
         res_file_list = []
-        tune_df = self.tune_param_df
+        tune_df = self.hyper_param_df
         tune_dict_list = tune_df.to_dict('records')
 
         # Each row of the dataframe stands for a trial (hyper-parameter combination).
-        for i in range(len(tune_df)):
+        for row_idx in range(len(tune_df)):
 
             # Get the current trial's config & result file.
-            para_dict = deepcopy(self.trial_config_dict)
-            para_dict.update(tune_dict_list[i])
-            res_file = self.model_config(Dict2Config(para_dict)).res_file
+            self.model_config_obj.__dict__.update(tune_dict_list[row_idx])
+            res_file = self.model_config_obj.res_file
 
             if os.path.exists(res_file):
                 res_file_list.append(res_file)
         return res_file_list
     
 
-    def summarize_by_percentage(dataset, model, metric=EVAL_METRIC):
+    def summarize_by_percentage(self, dataset, model, metric=EVAL_METRIC):
         '''
         Summarize model results under all existing percentage settings.
         This method is used to summarize the results of **all** percentage settings, \
@@ -265,7 +259,7 @@ def iter_time_estimate(prefix, postfix, start_time, iters_finished, total_iters)
     cur_run_time = time.time() - start_time
     total_estimated_time = cur_run_time * total_iters / iters_finished
     print(
-        f'{prefix} [{time2str(cur_run_time)}/{time2str(total_estimated_time)}, {time2str(total_estimated_time - cur_run_time)} left] {postfix} [{get_cur_time()}]')
+        f'{prefix} [{time2str(cur_run_time)}/{time2str(total_estimated_time)}, {time2str(total_estimated_time - cur_run_time)} left] {postfix} [{get_cur_time()}]\n')
 
 
 def dict_product(dct : dict):
@@ -312,33 +306,33 @@ def res_to_excel(res_file_list : list, out_prefix : str, interested_metric : str
                 # Find the avg & std string in the txt file generated by `calc_mean_std`.
                 for res_line in res_lines:
                     if res_line[0] == '{':
-                        d : dict = ast.literal_eval(res_line.strip('\n'))
+                        dct : dict = ast.literal_eval(res_line.strip('\n'))
 
-                        if 'dataset' in d.keys():  # parameters
-                            param_dict = d.copy()
-                        elif 'avg_' in list(d.keys())[0]:  # mean results
-                            avg_res_dict = dict(zip(d.keys(), [float(v) for v in d.values()]))
-                        elif 'std_' in list(d.keys())[0]:
-                            std_res_dict = dict(zip(d.keys(), [float(v) for v in d.values()]))
+                        if 'dataset' in dct.keys():  # the *last* line of parameters in the txt file
+                            param_dict = dct.copy()
+                            param_dict.pop('seed')
+                        elif 'avg_' in list(dct.keys())[0]:  # mean results
+                            avg_res_dict = dict(zip(dct.keys(), [float(v) for v in dct.values()]))
+                        elif 'std_' in list(dct.keys())[0]:
+                            std_res_dict = dict(zip(dct.keys(), [float(v) for v in dct.values()]))
+                        else:
+                            pass
 
-                # Generate the summary dict: model + mean results + std results
+                # Generate the summary dict: model params + mean results + std results
                 try:
-                    # _interested_conf_list : model, can be adjusted by modifying `ModelConfigABS`.
-                    sum_dict.update(get_subset_dict(param_dict, param_dict['_interested_conf_list']))
+                    sum_dict.update(param_dict)
                     sum_dict.update(avg_res_dict)
                     sum_dict.update(std_res_dict)
                 except:
                     print(f'!!!!File {f.name} is not summarized, skipped!!!!')
                     continue
-
-                sum_dict.pop('_interested_conf_list')
-                param_dict.pop('_interested_conf_list')
-
-                sum_dict['config2str'] = param_dict
+                
+                # Save `param_dict` to deal with NA columns.
+                sum_dict['param_dict'] = param_dict     
                 sum_dict_list.append(sum_dict)
 
-    sum_df = pd.DataFrame.from_dict(sum_dict_list).sort_values(interested_metric, ascending=False)
-    max_res = sum_df.max()[interested_metric]
+    sum_df = pd.DataFrame.from_dict(sum_dict_list).sort_values(interested_metric, ascending=False, ignore_index=True)
+    max_res = sum_df.loc[0, interested_metric]
 
     # ! Use mean and std to generate final results.
     metric_names = [cname[4:] for cname in sum_df.columns if 'avg' in cname]
@@ -351,11 +345,11 @@ def res_to_excel(res_file_list : list, out_prefix : str, interested_metric : str
     # ! Deal with NA columns. ?
     for col in sum_df.columns[sum_df.isnull().any()]:
         for index, row in sum_df.iterrows():
-            sum_df.loc[index, col] = row.config2str[col]
+            sum_df.loc[index, col] = row.param_dict[col]            # ? dict[col]
 
-    # Reorder column order list : move config2str to the end.
-    col_names = list(sum_df.columns) + ['config2str']
-    col_names.remove('config2str')          # Remove first occurrence of value.
+    # Reorder column order list : move param_dict to the end.
+    col_names = list(sum_df.columns) + ['param_dict']
+    col_names.remove('param_dict')          # Remove first occurrence of value.
     sum_df = sum_df[col_names]
 
     # Save to excel file.
@@ -417,21 +411,21 @@ def load_dict_results(res_file):
 
         for res_line in res_lines:
             if res_line[0] == '{':                  # ensure the line is a dict string
-                d = ast.literal_eval(res_line.strip('\n'))
+                dct : dict = ast.literal_eval(res_line.strip('\n'))
 
-                if 'model' in d.keys():             # the line contains parameters: lr, seed, etc.
+                if 'model' in dct.keys():             # the line contains parameters: lr, seed, etc.
                     trial_idx += 1
                     parameters[trial_idx] = res_line.strip('\n')      # string of param dict
-                elif 'avg_' in list(d.keys())[0] or 'std_' in list(d.keys())[0]:
+                elif 'avg_' in list(dct.keys())[0] or 'std_' in list(dct.keys())[0]:
                     pass                            # ?
                 else:                               # the line contains results: test_acc, val_acc, etc.
                     if metric_list is None:
-                        metric_list = list(d.keys())
+                        metric_list = list(dct.keys())
                         for metric in metric_list:          # init metric dict
                             exec(f'{metric.replace("-", "")}=dict()')
                     
                     for metric in metric_list:
-                        exec(f'{metric.replace("-", "")}[eid]=float(d[\'{metric}\'])')
+                        exec(f'{metric.replace("-", "")}[trial_idx]=float(dct[\'{metric}\'])')
     
     # `metric_set_str` is like: 'val_acc, test_acc, ...'
     metric_list_str = str(metric_list).replace('\'', '').strip('[').strip(']').replace("-", "")
