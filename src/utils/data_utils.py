@@ -455,3 +455,13 @@ def min_max_scaling(input, type='col'):
     else:
         ValueError('Invalid type of min-max scaling.')
 
+
+if __name__ == "__main__":
+
+    g, features, _, _, _, _, _, _ = preprocess_data('airport', 0)
+
+    # Get the max degree in graph `g` 
+    # to check if it's consistent with the dim of the "one-hot degree vectors".
+    # Each entry of the "one-hot degree vectors" corresponds to one degree.
+    print(g.in_degrees().max())
+
